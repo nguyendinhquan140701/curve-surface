@@ -1,19 +1,15 @@
 import sys
 
-sys.path.append("E:\Quan\AutoRoboticInspection-V1\VIKO_UltraRobot")
-# sys.path.append("E:\Project\Robot-6DOF\VIKO_UltraRobot")
+sys.path.append("E:\Quan\AutoRoboticInspection-V1\curve-surface")
+
 from robodk.robolink import *
 from robodk.robomath import *
 import numpy as np
 import time
-from library import vision_robotic as vis
 from library import robot_lib_modify as rob
 from datetime import datetime
 from config import config as CFG
 
-
-def getCoordinates(model, image):
-    return vis.getCoordinates(model, image, True)
 
 def movHome():
     VisRob = VisionRobot()
@@ -23,56 +19,72 @@ def stop():
     VisRob = VisionRobot()
     VisRob.disConnectRobot()
 
-def run(coordinate_pixel_list, model_weld_list, _suf_, pos_status="home"):
-    try:
-        with open("trigger.txt", "r") as f:
-            checkData = f.read().strip()
-    except FileNotFoundError:
-        checkData = ''  # Set to empty string if file doesn't exist
+def target_curve():
+    realTargetStart = [26, 102, 450]
+    realTargetEnd = [26, -107, 450]
 
-    if checkData != '0':
-        with open("trigger.txt", "w") as f:
-            f.write('0')
+    yStep = abs(realTargetStart[1] - realTargetEnd[1]) / 50
+
+    init_Z = realTargetStart[2]
+    init_alpha = 0
+    alpha = []
+    yNewTarget = []
+    zNewTarget = []
+    newTarget = []
+
+
+    for i in range(50):
+        if i + 1 <= 15:
+            alpha.append(0)
+        elif i + 1 >= 16 and i + 1 <= 20:
+            init_alpha += 2
+            alpha.append(init_alpha)
+        else:  # i >= 17
+            init_alpha += 0.5
+            alpha.append(init_alpha)
+
+        # Calculate the new Z position
+        if i % 5 == 0 and i != 0 and i >= 15:
+            init_Z += 2
+
+        zNewTarget.append(init_Z)
+
+        # Calculate the new Y position
+        yNewTarget.append(realTargetStart[1] - i * yStep)
+
+        # Create the new target position and append to the newTarget list
+        currentTarget = [realTargetStart[0], yNewTarget[-1], zNewTarget[-1]]
+        newTarget.append(currentTarget)
+
+    print("(newTarget):", (newTarget))
+
+    return realTargetStart, realTargetEnd, alpha, newTarget
+           
+
+def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
 
     VisRob = VisionRobot()
+    VisRob.homePos(CFG.LINEAR_SPEEDS[0], CFG.JOINT_SPEEDS[1])
     if pos_status == "home":
         VisRob.fixedRef(0)
 
     else:
         stop()
-    
-    # Trigger and length to scan
-    def trigger(length_weld, trigger=False):
-        assert length_weld != 0, "No weld to scan. Can not trigger the laser"
-        with open("trigger.txt", "w") as f:
-            data = f'{trigger}'
-            f.write(data)
-            print(f'trigger:{data}')
+    print("alpha", alpha)
+    print("newTarget", realTargetStart)
+    target01, target02, thetaLaser, _ = VisRob.getTarget(realTargetStart, realTargetEnd, alpha[0], "0_degree")
+    VisRob.runMoveJ(target01, CFG.JOINT_SPEEDS[1])
 
-    for index, coordinate_pixel in enumerate(coordinate_pixel_list):
-        print(f"Weld model {model_weld_list[index]}")
-        target01, target02, thetaLaser, lengthWeld = VisRob.getTarget(coordinate_pixel, model_weld_list[index], _suf_)
-        time_scan = lengthWeld/CFG.RESOLUTION_Y_LASER/CFG.FREQUENCY
-        speeedScan = lengthWeld / time_scan
-        print('The information robotic laser ')
-        print('Speed scan: ', speeedScan)
-        print('Length planing ', lengthWeld)
-        
-        startWeld = VisRob.runMoveJ(target01)
-        # startWeld = True
+    for i in range(1, len(newTarget) - 1):
 
-        if startWeld:
-            trigger(lengthWeld, 1)
-            def robot_movement():
-                time.sleep(1)
-                VisRob.runMoveL(target02, speeedScan)
-                time.sleep(5)
-                # VisRob.runMoveL(target02, CFG.LINEAR_SPEEDS[1])
-                trigger(lengthWeld, 0)
-
-            robot_movement()  
-        else:
-            print("Error: Failed to reach target01")
+        pointA = newTarget[i]
+        pointB = newTarget[i + 1]
+        alpha_i = alpha[i]
+        target_i0, target_i1, thetaLaser, _ = VisRob.getTarget(pointA, pointB, alpha_i, "0_degree")
+        VisRob.runMoveJ(target_i0, CFG.JOINT_SPEEDS[0])
+        print("target_i0:", target_i0)
+        # VisRob.runMoveL(target_i1, CFG.LINEAR_SPEEDS[1])
+        print("target_i1:", target_i1)
 
     VisRob.homePos(CFG.LINEAR_SPEEDS[0], CFG.JOINT_SPEEDS[1])
 
@@ -331,7 +343,7 @@ class VisionRobot:
         target01ToBase = np.dot(rfToBase, target01ToRf)
 
         change_OX = CFG.DISTANCE_LASER2OBJECT * tan(np.radians(CFG.ROTATE_OX_LASER))
-        print("changeOx:", change_OX)
+        # print("changeOx:", change_OX)
   
         newPos2 = np.array([0, -pos_target02_oy_rf + change_OX, 0])
         newRef = target01ToBase
@@ -340,36 +352,23 @@ class VisionRobot:
         setRef = TxyzRxyz_2_Pose(newRef_nonMat)
         self.robot.setPoseFrame(setRef)
 
-        
+
         target01toNewRf = np.dot(target01ToBase, np.linalg.inv(target01ToBase))
         pos01toNewRf, rot01ToNewRf = self.robot_module.rotPos(target01toNewRf)
         target02toNewRf = self.robot_module.createRef(newPos2, rot01ToNewRf)
         pos02toNewRf, rot02ToNewRf = self.robot_module.rotPos(target02toNewRf)
 
-        # pos01toNewRf = np.array([backOx, change_OX, 0])
-        # rot01ToNewRf = np.array([0, 0, 0])
-        # pos02toNewRf = np.array([backOx, -pos_target02_oy_rf + change_OX, 0])
-        # rot02ToNewRf = np.array([0, 0, 0])
-        # # pos01toNewRf[0] += backOx
-        # # pos01toNewRf[1] = change_OX
-        # # pos02toNewRf[0] += backOx
-        # target01toNewRf = self.robot_module.createRef(pos01toNewRf, rot01ToNewRf)
-        # target02toNewRf = self.robot_module.createRef(pos02toNewRf, rot02ToNewRf)
+        newT1toNewRf = np.dot(target01toNewRf, rotx(np.radians(alpha)))
+        newT2toNewRf = np.dot(target02toNewRf, rotx(np.radians(alpha)))
 
-        if alpha != 0:
-            newT1toNewRf = np.dot(np.dot(target01toNewRf, roty(np.radians(alpha))), rotx(np.radians(-CFG.ROTATE_OX_LASER)))
-            newT2toNewRf = np.dot(np.dot(target02toNewRf, roty(np.radians(alpha))), rotx(np.radians(-CFG.ROTATE_OX_LASER)))
-        else:
-            newT1toNewRf = np.dot(np.dot(target01toNewRf, roty(np.radians(alpha))), rotx(np.radians(0)))  ## not config rotx
-            newT2toNewRf = np.dot(np.dot(target02toNewRf, roty(np.radians(alpha))), rotx(np.radians(0)))  ## not config rotx
 
         newPos1ToNewRf, newRot1ToNewRf = self.robot_module.rotPos(newT1toNewRf)
         newPos2ToNewRf, newRot2ToNewRf = self.robot_module.rotPos(newT2toNewRf)
-        print(f'backOx:{backOx}')
+        # print(f'backOx:{backOx}')
 
         newPos1ToNewRf[0] += backOx
         newPos2ToNewRf[0] += backOx
-        print(f'newPos1ToNewRf, newRot1ToNewRf:{newPos1ToNewRf}, {newRot1ToNewRf}\n newPos2ToNewRf, newRot2ToNewRf:{newPos2ToNewRf}, {newRot2ToNewRf}')
+        # print(f'newPos1ToNewRf, newRot1ToNewRf:{newPos1ToNewRf}, {newRot1ToNewRf}\n newPos2ToNewRf, newRot2ToNewRf:{newPos2ToNewRf}, {newRot2ToNewRf}')
         
         if alpha != 0:
             newPos1ToNewRf[1] += 0
@@ -388,67 +387,26 @@ class VisionRobot:
     def homePos(self, linearSpeed, joinSpeed):
         self.setRobot(linearSpeed, joinSpeed)
         self.fixedRef(0)
-        self.robot.MoveJ(self.rf_laser2rf_matrix)
+        self.robot.MoveJ(self.rf_laser2rf_matrix, CFG.JOINT_SPEEDS[1])
 
-    def getTarget(self, pixel, shape, _suf_: int):
+    def getTarget(self, realTarget01, realTarget02, alphaOx, shape):
         # target01, target02, theta_laser = None, None, None
         obj = VisionRobot()
         obj.test_fixedRef()
         testTarget01, testTarget02, angleLaserToObject = None, None, None
-        angleLaserToObject = self.robot_module.rotLaser(pixel)
-
-        coorPixel1 = pixel[0]
-        coorPixel2 = pixel[1]
-        print(f"coordinate_pixel:{pixel}")
-
-        #### fix value
-        self.disCameraToObject = CFG.DISTANCE_CAMERA2OBJECT
-        self.pixelFocalLength = CFG.FOCAL_LENGTH * 1000 / CFG.PIXEL_SIZE
-        ####
-
-        xToCamera01, yToCamera01 = self.robot_module.convertCoordinates(CFG.RESOLUTION_X, CFG.RESOLUTION_Y, coorPixel1[0], coorPixel1[1],\
-                                                                        self.pixelFocalLength, self.disCameraToObject, theta=180,)  # cfg
-
-        xToCamera02, yToCamera02 = self.robot_module.convertCoordinates(CFG.RESOLUTION_X, CFG.RESOLUTION_Y, coorPixel2[0], coorPixel2[1],\
-                                                                        self.pixelFocalLength, self.disCameraToObject, theta=180,)  # cfg
+        angleLaserToObject = 0    #### not input angleLaserToObject
         
-        print("xToCamera01, yToCamera01:", xToCamera01, yToCamera01)
-        print("xToCamera02, yToCamera02:", xToCamera02, yToCamera02)
-
-        zLaserToObject = CFG.HOME_LASER - CFG.DISTANCE_LASER2OBJECT
+        zLaserToObject = realTarget01[2] - CFG.DISTANCE_LASER2OBJECT
         print(f"zLaserToObject:{zLaserToObject}")
         if zLaserToObject > CFG.SAFE_DISTANCE:
-            zLaserToObject = 330
+            realTarget01[2], realTarget02[2] = 330, 330
             print("Warning the collision. Check the distance")
-        realTarget01 = np.array([xToCamera01, yToCamera01, zLaserToObject])
-        realTarget02 = np.array([xToCamera02, yToCamera02, zLaserToObject])
+        print("xToCamera01, yToCamera01:", realTarget01)
+        print("xToCamera02, yToCamera02:", realTarget02)
 
-        if shape == "90_degree":
-            alpha = CFG.ROTATE_OY_LASER * _suf_
-            print(f"alpha:{alpha}")
-            if alpha < 0:
-                backOx = (-np.tan(np.radians(CFG.ROTATE_OY_LASER)) * CFG.DISTANCE_LASER2OBJECT)
-                testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
-                obj.test_target(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
-            else:
-                backOx = (np.tan(np.radians(CFG.ROTATE_OY_LASER)) * CFG.DISTANCE_LASER2OBJECT)
-                testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
-                obj.test_target(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
-
-        elif shape == "30_degree":
-            alpha = CFG.ROTATE_OY_LASER * _suf_
-            print(f"alpha:{alpha}")
-            if alpha < 0:
-                backOx = (-np.tan(np.radians(CFG.ROTATE_OY_LASER)) * CFG.DISTANCE_LASER2OBJECT)  #### need more condition
-                testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
-                obj.test_target(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
-            else:
-                backOx = (np.tan(np.radians(CFG.ROTATE_OY_LASER)) * CFG.DISTANCE_LASER2OBJECT)  #### need more condition
-                testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
-                obj.test_target(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
-
-        elif shape == "0_degree":
-            alpha = backOx = 0
+        if shape == "0_degree":
+            alpha = alphaOx
+            backOx = 0
             testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
 
             obj.test_target(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
@@ -463,8 +421,8 @@ class VisionRobot:
         self.robot.MoveL(target)
         return True
 
-    def runMoveJ(self, target):
-        self.setRobot(CFG.LINEAR_SPEEDS[0], CFG.JOINT_SPEEDS[1])
+    def runMoveJ(self, target, speed_moveJ):
+        self.setRobot(CFG.LINEAR_SPEEDS[0], speed_moveJ)
         self.robot.MoveJ(target)
         return True
 
@@ -483,5 +441,7 @@ class VisionRobot:
 #############################################
 
 if __name__ == "__main__":
-    print("Done")
+    print("Testing for curve-surface")
+    start, end, alpha, newTarget = target_curve()
+    run(start, end, alpha, newTarget, pos_status="home")
 
