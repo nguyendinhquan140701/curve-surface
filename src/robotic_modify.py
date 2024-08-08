@@ -75,16 +75,30 @@ def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
     target01, target02, thetaLaser, _ = VisRob.getTarget(realTargetStart, realTargetEnd, alpha[0], "0_degree")
     VisRob.runMoveJ(target01, CFG.JOINT_SPEEDS[1])
 
-    for i in range(1, len(newTarget) - 1):
+    # for i in range(1, len(newTarget) - 1):
 
-        pointA = newTarget[i]
-        pointB = newTarget[i + 1]
-        alpha_i = alpha[i]
-        target_i0, target_i1, thetaLaser, _ = VisRob.getTarget(pointA, pointB, alpha_i, "0_degree")
-        VisRob.runMoveJ(target_i0, CFG.JOINT_SPEEDS[0])
-        print("target_i0:", target_i0)
-        # VisRob.runMoveL(target_i1, CFG.LINEAR_SPEEDS[1])
-        print("target_i1:", target_i1)
+    #     pointA = newTarget[i]
+    #     pointB = newTarget[i + 1]
+    #     alpha_i = alpha[i]
+    #     target_i0, target_i1, thetaLaser, _ = VisRob.getTarget(pointA, pointB, alpha_i, "0_degree")
+    #     VisRob.runMoveJ(target_i0, CFG.JOINT_SPEEDS[0])
+    #     print("target_i0:", target_i0)
+    #     # VisRob.runMoveL(target_i1, CFG.LINEAR_SPEEDS[1])
+    #     print("target_i1:", target_i1)
+
+    pointA = newTarget[20]
+    pointB = newTarget[-1]
+    alphaA = alpha[20]
+    alphaB = alpha[-1]
+    target_i0, target_i1, thetaLaser, _ = VisRob.getTarget(pointA, pointB, alphaA, alphaB, "0_degree")
+    VisRob.runMoveC(target_i0, CFG.JOINT_SPEEDS[0])
+    VisRob.runMoveC(target_i1, CFG.JOINT_SPEEDS[0])
+    print("target_i0:", target_i0)
+    # VisRob.runMoveL(target_i1, CFG.LINEAR_SPEEDS[1])
+    print("target_i1:", target_i1)
+
+    print("thetaLaser:", thetaLaser)
+
 
     VisRob.homePos(CFG.LINEAR_SPEEDS[0], CFG.JOINT_SPEEDS[1])
 
@@ -313,7 +327,7 @@ class VisionRobot:
 
    #####################################################
    #####################################################
-    def newcreatePoint(self, target_01, target_02, theta_laser, backOx, alpha):
+    def newcreatePoint(self, target_01, target_02, theta_laser, backOx, alphaA, alphaB):
         """
         (new method) Create point with respect to reference frame
         """
@@ -358,8 +372,8 @@ class VisionRobot:
         target02toNewRf = self.robot_module.createRef(newPos2, rot01ToNewRf)
         pos02toNewRf, rot02ToNewRf = self.robot_module.rotPos(target02toNewRf)
 
-        newT1toNewRf = np.dot(target01toNewRf, rotx(np.radians(alpha)))
-        newT2toNewRf = np.dot(target02toNewRf, rotx(np.radians(alpha)))
+        newT1toNewRf = np.dot(target01toNewRf, rotx(np.radians(alphaA)))
+        newT2toNewRf = np.dot(target02toNewRf, rotx(np.radians(alphaB)))
 
 
         newPos1ToNewRf, newRot1ToNewRf = self.robot_module.rotPos(newT1toNewRf)
@@ -389,7 +403,7 @@ class VisionRobot:
         self.fixedRef(0)
         self.robot.MoveJ(self.rf_laser2rf_matrix, CFG.JOINT_SPEEDS[1])
 
-    def getTarget(self, realTarget01, realTarget02, alphaOx, shape):
+    def getTarget(self, realTarget01, realTarget02, alphaA, alphaB, shape):
         # target01, target02, theta_laser = None, None, None
         obj = VisionRobot()
         obj.test_fixedRef()
@@ -405,9 +419,8 @@ class VisionRobot:
         print("xToCamera02, yToCamera02:", realTarget02)
 
         if shape == "0_degree":
-            alpha = alphaOx
             backOx = 0
-            testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
+            testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alphaA, alphaB)
 
             obj.test_target(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
 
@@ -417,13 +430,18 @@ class VisionRobot:
         return testTarget01, testTarget02, angleLaserToObject , test_length_weld
 
     def runMoveL(self, target, speedScan):
-        self.setRobot(speedScan, CFG.JOINT_SPEEDS[0])
+        self.setRobot(speedScan)
         self.robot.MoveL(target)
         return True
 
     def runMoveJ(self, target, speed_moveJ):
-        self.setRobot(CFG.LINEAR_SPEEDS[0], speed_moveJ)
+        self.setRobot(speed_moveJ)
         self.robot.MoveJ(target)
+        return True
+    
+    def runMoveC(self, target, speed_moveC):
+        self.setRobot(CFG.LINEAR_SPEEDS[0], speed_moveC)
+        self.robot.MoveC(target)
         return True
 
     def setRobot(self, linearSpeed, jointSpeed):
