@@ -56,7 +56,7 @@ def target_curve():
         currentTarget = [realTargetStart[0], yNewTarget[-1], zNewTarget[-1]]
         newTarget.append(currentTarget)
 
-    print("(newTarget):", (newTarget))
+    # print("(newTarget):", (newTarget))
 
     return realTargetStart, realTargetEnd, alpha, newTarget
            
@@ -70,9 +70,8 @@ def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
 
     else:
         stop()
-    print("alpha", alpha)
-    print("newTarget", realTargetStart)
-    target01, target02, thetaLaser, _ = VisRob.getTarget(realTargetStart, realTargetEnd, alpha[0], "0_degree")
+    # print("alpha", alpha)
+    target01, target02, thetaLaser, _ = VisRob.getTarget(realTargetStart, realTargetEnd, alpha[0], alpha[0], "0_degree")
     VisRob.runMoveJ(target01, CFG.JOINT_SPEEDS[1])
 
     # for i in range(1, len(newTarget) - 1):
@@ -91,14 +90,16 @@ def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
     alphaA = alpha[20]
     alphaB = alpha[-1]
     target_i0, target_i1, thetaLaser, _ = VisRob.getTarget(pointA, pointB, alphaA, alphaB, "0_degree")
-    VisRob.runMoveC(target_i0, CFG.JOINT_SPEEDS[0])
-    VisRob.runMoveC(target_i1, CFG.JOINT_SPEEDS[0])
-    print("target_i0:", target_i0)
+    # print("target_i0:", type(target_i0))
+    # print("target_i1:", target_i1)
+
+    joint_i0 = [22.001953, 32.123475, -25.801392, 16.242188, -37.162627, -35.410395]
+    joint_i1 = [38.448242, 45.288118, -8.478150, 23.878126, -54.849241, -55.517372]
+    print("joint_i0:", type(joint_i0))
+
+    # VisRob.runMoveC(target_i0, target_i1, CFG.JOINT_SPEEDS[0])
+
     # VisRob.runMoveL(target_i1, CFG.LINEAR_SPEEDS[1])
-    print("target_i1:", target_i1)
-
-    print("thetaLaser:", thetaLaser)
-
 
     VisRob.homePos(CFG.LINEAR_SPEEDS[0], CFG.JOINT_SPEEDS[1])
 
@@ -221,7 +222,7 @@ class VisionRobot:
         self.test_rf_laser2rf = test_rf_laser2rf
 
 
-    def test_target(self, target_01, target_02, theta_laser, backOx, alpha_rot_Oy):
+    def test_target(self, target_01, target_02, theta_laser, alphaA, alphaB):
 
         H_target01ToCamera = self.robot_module.createRef([target_01[0], target_01[1], target_01[2]],[0, 0, np.radians(theta_laser)])
         H_target02ToCamera = self.robot_module.createRef([target_02[0], target_02[1], target_02[2]],[0, 0, np.radians(theta_laser)])
@@ -235,17 +236,13 @@ class VisionRobot:
 
         H_target01ToLaser = np.dot(np.linalg.inv(self.test_rf_laser2camera), H_target01ToCamera)
         H_target02ToLaser = np.dot(np.linalg.inv(self.test_rf_laser2camera), H_target02ToCamera)
-        H_target01tobase = np.dot(self.test_rf_laser2rf, H_target01ToLaser)
-        H_target02tobase = np.dot(self.test_rf_laser2rf, H_target02ToLaser)
-        # posLaser01, rotLaser01 = self.robot_module.rotPos(H_target01tobase)
-        # posLaser02, rotLaser02 = self.robot_module.rotPos(H_target02tobase)
-        # print(f'newPos01:{posLaser01}, {rotLaser01}')
-        
+
+        """ 
         def config_target(X, Y, theta_laser, backOx, alpha_rot_Oy):    
             L1 = np.abs(backOx)
             L2 = np.abs((np.tan(np.radians(CFG.ROTATE_OX_LASER)) * CFG.DISTANCE_LASER2OBJECT))
             delta_x = delta_y = 0
-            theta_laser = abs(theta_laser)
+            theta_laser = abs(theta_laser)          
             if theta_laser > 0:
                 if alpha_rot_Oy < 0:
                     delta_x = L1 *np.cos(np.radians(theta_laser)) + L2 * np.sin(np.radians(theta_laser))
@@ -289,29 +286,26 @@ class VisionRobot:
                 new_Y = Y + delta_y
             
             return [new_X, new_Y]
+            """
         
         pos_targetToLaser01, rot_targetToLaser01 = self.robot_module.rotPos(H_target01ToLaser)
         pos_targetToLaser02, rot_targetToLaser02 = self.robot_module.rotPos(H_target02ToLaser)
 
         # calculate the new XY position of laser
-        newXY_01 = config_target(pos_targetToLaser01[0], pos_targetToLaser01[1], theta_laser, backOx, alpha_rot_Oy)
-        newXY_02 = config_target(pos_targetToLaser02[0], pos_targetToLaser02[1], theta_laser, backOx, alpha_rot_Oy)
+        # newXY_01 = config_target(pos_targetToLaser01[0], pos_targetToLaser01[1], theta_laser, backOx, alpha_rot_Oy)
+        # newXY_02 = config_target(pos_targetToLaser02[0], pos_targetToLaser02[1], theta_laser, backOx, alpha_rot_Oy)
 
-        pos_targetToLaser01[0] = newXY_01[0]
-        pos_targetToLaser01[1] = newXY_01[1]
-
-        pos_targetToLaser02[0] = newXY_02[0]
-        pos_targetToLaser02[1] = newXY_02[1]
+        # pos_targetToLaser01[0] = newXY_01[0]
+        # pos_targetToLaser01[1] = newXY_01[1]
+        # pos_targetToLaser02[0] = newXY_02[0]
+        # pos_targetToLaser02[1] = newXY_02[1]
 
         # create the H matrix about new laser position and new rotation
         H_newTargetToLaser01 = self.robot_module.createRef(pos_targetToLaser01, rot_targetToLaser01)
         H_newTargetToLaser02 = self.robot_module.createRef(pos_targetToLaser02, rot_targetToLaser02)
 
-        refTarget = self.robot_module.createRef([0, 0, 0], [0, 0, 0])
-        # R_refTarget = np.dot(np.dot(refTarget, roty(np.radians(alpha_rot_Oy))), rotx(np.radians(-CFG.ROTATE_OX_LASER)))
-
-        R_targetToLaser01 = np.dot(np.dot(H_newTargetToLaser01, roty(np.radians(alpha_rot_Oy))), rotx(np.radians(-CFG.ROTATE_OX_LASER)))
-        R_targetToLaser02 = np.dot(np.dot(H_newTargetToLaser02, roty(np.radians(alpha_rot_Oy))), rotx(np.radians(-CFG.ROTATE_OX_LASER)))
+        R_targetToLaser01 = np.dot(H_newTargetToLaser01,  rotx(np.radians(alphaA)))
+        R_targetToLaser02 = np.dot(H_newTargetToLaser02,  rotx(np.radians(alphaB)))
 
         # create the H matrix new target to basec
         H_newTarget01tobase = np.dot(self.test_rf_laser2rf, R_targetToLaser01)
@@ -375,21 +369,9 @@ class VisionRobot:
         newT1toNewRf = np.dot(target01toNewRf, rotx(np.radians(alphaA)))
         newT2toNewRf = np.dot(target02toNewRf, rotx(np.radians(alphaB)))
 
-
         newPos1ToNewRf, newRot1ToNewRf = self.robot_module.rotPos(newT1toNewRf)
         newPos2ToNewRf, newRot2ToNewRf = self.robot_module.rotPos(newT2toNewRf)
         # print(f'backOx:{backOx}')
-
-        newPos1ToNewRf[0] += backOx
-        newPos2ToNewRf[0] += backOx
-        # print(f'newPos1ToNewRf, newRot1ToNewRf:{newPos1ToNewRf}, {newRot1ToNewRf}\n newPos2ToNewRf, newRot2ToNewRf:{newPos2ToNewRf}, {newRot2ToNewRf}')
-        
-        if alpha != 0:
-            newPos1ToNewRf[1] += 0
-            newPos2ToNewRf[1] += 0
-        else:
-            # pass
-            print(f"Pos1 and Pos2 changed:{newPos1ToNewRf}, {newPos2ToNewRf}")
 
         target01_none_mat = np.concatenate((newPos1ToNewRf, newRot1ToNewRf), axis=0)
         target02_none_mat = np.concatenate((newPos2ToNewRf, newRot2ToNewRf), axis=0)
@@ -421,8 +403,7 @@ class VisionRobot:
         if shape == "0_degree":
             backOx = 0
             testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alphaA, alphaB)
-
-            obj.test_target(realTarget01, realTarget02, angleLaserToObject, backOx, alpha)
+            obj.test_target(realTarget01, realTarget02, angleLaserToObject, alphaA, alphaB)
 
         else:
             stop()
@@ -430,18 +411,18 @@ class VisionRobot:
         return testTarget01, testTarget02, angleLaserToObject , test_length_weld
 
     def runMoveL(self, target, speedScan):
-        self.setRobot(speedScan)
+        self.setRobot(speedScan, CFG.JOINT_SPEEDS[1])
         self.robot.MoveL(target)
         return True
 
     def runMoveJ(self, target, speed_moveJ):
-        self.setRobot(speed_moveJ)
+        self.setRobot(CFG.LINEAR_SPEEDS[0], speed_moveJ)
         self.robot.MoveJ(target)
         return True
     
-    def runMoveC(self, target, speed_moveC):
+    def runMoveC(self, target1, target2, speed_moveC):
         self.setRobot(CFG.LINEAR_SPEEDS[0], speed_moveC)
-        self.robot.MoveC(target)
+        self.robot.MoveC(target1, target2)
         return True
 
     def setRobot(self, linearSpeed, jointSpeed):
