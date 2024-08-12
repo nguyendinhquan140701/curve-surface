@@ -4,6 +4,10 @@ from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+import trimesh
+import plotly.graph_objects as go
+import plotly.offline as pyo
+
 
 def mean_normal_vector(point_clouds):
     normal_vector_list = []
@@ -125,20 +129,25 @@ def calculate_angle_between_vectors(b):
 
 
 if __name__ == "__main__":
-
+    mesh = trimesh.load_mesh("data/tess.obj")
+    vertices = mesh.vertices
     coord = o3d.geometry.TriangleMesh.create_coordinate_frame()
-
+    x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
     # Generate the target point cloud representing a sinusoidal curve surface
-    x = np.linspace(-40, 40, 20)
-    y = np.linspace(-40, 40, 20)
-    X, Y = np.meshgrid(x, y)
-    Z = -(1 / 70) * (X**2) + -(1 / 70) * (Y**2)  # Phương trình parabol
+    # x = np.linspace(-40, 40, 20)
+    # y = np.linspace(-40, 40, 20)
+    # X, Y = np.meshgrid(x, y)
+    # print(f"X, Y: {X.shape}, {Y.shape}")
+    # Z = -(1 / 70) * (X**2) + -(1 / 70) * (Y**2)  # Phương trình parabol
+    Z = z
+
 
     # X = X + 450
     # Y= Y -50
     # Z = Z - 60
     # print(f'X, Y, Z: {X, Y, Z}')
-    np_curve_surface = np.stack([X, Y, Z], axis=-1)
+    np_curve_surface = np.stack([x, y, Z], axis=-1)
+    print(f"np_curve_surface: {np_curve_surface.shape}")
     print(f"np_curve_surface: {np_curve_surface[5]}")
     source = np_curve_surface.reshape((-1, 3))
     pcd_show([source, coord])
@@ -164,27 +173,69 @@ if __name__ == "__main__":
     pcd_show([source_pcd, coord])
     pcd_show([coord])
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(source[:, 0], source[:, 1], source[:, 2])
-    ax.grid(False)
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    ax.set_title("Points cloud on Surface")
-    for point, normal in zip(source, source_nv):
-        ax.quiver(
-            point[0],
-            point[1],
-            point[2],
-            normal[0],
-            normal[1],
-            normal[2],
-            length=4,
-            color="purple",
-        )
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection="3d")
+    # ax.scatter(source[:, 0], source[:, 1], source[:, 2])
+    # ax.grid(False)
+    # ax.set_xlabel("X")
+    # ax.set_ylabel("Y")
+    # ax.set_zlabel("Z")
+    # ax.set_title("Points cloud on Surface")
+    # for point, normal in zip(source, source_nv):
+    #     ax.quiver(
+    #         point[0],
+    #         point[1],
+    #         point[2],
+    #         normal[0],
+    #         normal[1],
+    #         normal[2],
+    #         length=4,
+    #         color="purple",
+    #     )
 
-    plt.show()
+    # plt.show()
+
+
+    scatter = go.Scatter3d(
+    x=source[:, 0],
+    y=source[:, 1],
+    z=source[:, 2],
+    mode='markers',
+    marker=dict(size=5, color='blue'),
+    name='Points'
+    )
+
+    # Create a 3D quiver plot using cone traces
+    cones = go.Cone(
+        x=source[:, 0],
+        y=source[:, 1],
+        z=source[:, 2],
+        u=source_nv[:, 0],
+        v=source_nv[:, 1],
+        w=source_nv[:, 2],
+        sizemode='scaled',
+        sizeref=2,
+        anchor='tail',
+        colorscale='Viridis',
+        showscale=False,
+        name='Normals'
+    )
+
+    # Define the layout
+    layout = go.Layout(
+        scene=dict(
+            xaxis=dict(title='X'),
+            yaxis=dict(title='Y'),
+            zaxis=dict(title='Z'),
+        ),
+        title="Points cloud on Surface"
+    )
+
+    # Create the figure and add traces
+    fig = go.Figure(data=[scatter, cones], layout=layout)
+
+    # Show the plot
+    fig.show()
 
 
 """

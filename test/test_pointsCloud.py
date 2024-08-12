@@ -3,19 +3,27 @@ import trimesh
 import plotly.graph_objects as go
 import numpy as np
 import plotly.offline as pyo
+import open3d as o3d
 
 # %%
 # mesh = trimesh.load_mesh("data/obj2k.obj")
 mesh = trimesh.load_mesh("data/tess.obj")
+mesh.show()
 vertices = mesh.vertices
+print("len(vertices):", len(vertices))
+# Load the .obj file
+mesh = o3d.io.read_triangle_mesh("data/tess.obj")
 
+# Visualize the mesh
+o3d.visualization.draw_geometries([mesh])
 
 # %%
 x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
 print(f"length:{len(x)}, {len(y)}, {len(z)}")
-
+print("x, y, z:", x)
 
 points_array = np.stack((x, y, z), axis=-1)
+print("points_array:", points_array)
 centroid = np.mean(points_array, axis=0)
 print(f"Original Centroid: {centroid}")
 
