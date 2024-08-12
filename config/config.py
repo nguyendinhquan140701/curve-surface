@@ -10,7 +10,7 @@ config file
 ########################################################### ROBOTIC ###################################################################
 PIXEL_SIZE = 3.45  ## unit: micrometer
 LINEAR_SPEEDS = [10, 5]
-JOINT_SPEEDS = [10, 30] ### Not over 100
+JOINT_SPEEDS = [7, 30] ### Not over 100
 FOCAL_LENGTH = 16
 RESOLUTION_X = 2448  # DEFAULT RESOLUTION
 RESOLUTION_Y = 2048  # DEFAULT RESOLUTION
