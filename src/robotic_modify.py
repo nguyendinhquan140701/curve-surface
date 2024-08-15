@@ -23,7 +23,7 @@ def target_curve():
     realTargetStart = [26, 102, 450]
     realTargetEnd = [26, -107, 450]
 
-    yStep = abs(realTargetStart[1] - realTargetEnd[1]) / 50
+    yStep = abs(realTargetStart[1] - realTargetEnd[1]) / 100
 
     init_Z = realTargetStart[2]
     init_alpha = 0
@@ -33,19 +33,21 @@ def target_curve():
     newTarget = []
 
 
-    for i in range(50):
-        if i + 1 <= 15:
+    for i in range(100):
+        if i + 1 <= 30:
             alpha.append(0)
-        elif i + 1 >= 16 and i + 1 <= 20:
-            init_alpha += 2
+        elif i + 1 >= 31 and i + 1 <= 38:
+            init_alpha += 0.5
             alpha.append(init_alpha)
+            init_Z += 0.1
         else:  # i >= 17
             init_alpha += 0.5
             alpha.append(init_alpha)
+            init_Z += 0.1
 
-        # Calculate the new Z position
-        if i % 5 == 0 and i != 0 and i >= 15:
-            init_Z += 2
+        # # Calculate the new Z position
+        # if i % 5 == 0 and i != 0 and i >= 15:
+        #     init_Z += 2
 
         zNewTarget.append(init_Z)
 
@@ -72,19 +74,34 @@ def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
     else:
         stop()
     # print("alpha", alpha)
-    target01, target02, thetaLaser, _ = VisRob.getTarget(realTargetStart, realTargetEnd, alpha[0], alpha[0], "0_degree")
+    target01, target02, _, _, H_flangeToBase01 = VisRob.getTarget(realTargetStart, realTargetEnd, alpha[0], alpha[0], "0_degree")
     VisRob.runMoveJ(target01, CFG.JOINT_SPEEDS[1])
 
-    for i in range(1, len(newTarget) - 1):
 
+    # joints, _ = VisRob.getParam()
+    # print("joints:", joints)
+    # robot_position = VisRob.robot.SolveFK(joints)
+    # print("robot_position:", robot_position)
+
+    # print("H_flangeToBase01:", H_flangeToBase01)
+    # new_joints = VisRob.robot.SolveIK(H_flangeToBase01)
+    # print("new_joints:", new_joints)
+    
+
+    for i in range(1, len(newTarget) - 1):
         pointA = newTarget[i]
         pointB = newTarget[i + 1]
         alpha_i = alpha[i]
-        target_i0, target_i1, thetaLaser, _ = VisRob.getTarget(pointA, pointB, alpha_i, 0, "0_degree")
-        VisRob.runMoveJ(target_i0, CFG.JOINT_SPEEDS[0])
-        # print("target_i0:", target_i0)
-        # VisRob.runMoveL(target_i1, CFG.LINEAR_SPEEDS[1])
-        # print("target_i1:", target_i1)
+        target_i0, target_i1, _, _, _ = VisRob.getTarget(pointA, pointB, alpha_i, 0, "0_degree")
+        VisRob.runMoveJ(target_i0, CFG.LINEAR_SPEEDS[0])
+    
+    for i in range(len(newTarget)-1, 1, -1):
+        pointA = newTarget[i]
+        pointB = newTarget[i -1]
+        alpha_i = alpha[i]
+        target_i0, target_i1, _, _, _ = VisRob.getTarget(pointA, pointB, alpha_i, 0, "0_degree")
+        VisRob.runMoveJ(target_i0, CFG.LINEAR_SPEEDS[0])
+
 
     pointA = newTarget[20]
     pointB = newTarget[-1]
@@ -96,7 +113,7 @@ def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
 
     joint_i0 = [22.001953, 32.123475, -25.801392, 16.242188, -37.162627, -35.410395]
     joint_i1 = [38.448242, 45.288118, -8.478150, 23.878126, -54.849241, -55.517372]
-    print("joint_i0:", type(joint_i0))
+    # print("joint_i0:", type(joint_i0))
 
     # VisRob.runMoveC(target_i0, target_i1, CFG.JOINT_SPEEDS[0])
 
@@ -106,7 +123,7 @@ def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
 
     data_export = {
         "id": str(datetime.now()),
-        "theta_laser": thetaLaser,
+        # "theta_laser": thetaLaser,
         # Add additional data to export if needed
     }
     print(f"data_export: {data_export}")
@@ -311,7 +328,8 @@ class VisionRobot:
         # print(f'rf_laser2flange:{self.rf_laser2flange}')
         newFlangePos01, newFlangeRot01 = self.robot_module.rotPos(H_flangeToBase01)
         newFlangePos02, newFlangeRot02 = self.robot_module.rotPos(H_flangeToBase02)
-        # print(f'newFlangePos01:{newFlangePos01}, {newFlangeRot01},\n newFlangePos02:{newFlangePos02}, {newFlangeRot02}\n')
+        print(f'newFlangePos01:{newFlangePos01}, {newFlangeRot01},\n newFlangePos02:{newFlangePos02}, {newFlangeRot02}\n')
+        return newFlangePos01, newFlangeRot01
 
    #####################################################
    #####################################################
@@ -391,18 +409,20 @@ class VisionRobot:
         if zLaserToObject > CFG.SAFE_DISTANCE:
             realTarget01[2], realTarget02[2] = 330, 330
             print("Warning the collision. Check the distance")
-        print("xToCamera01, yToCamera01:", realTarget01)
-        print("xToCamera02, yToCamera02:", realTarget02)
+        # print("xToCamera01, yToCamera01:", realTarget01)
+        # print("xToCamera02, yToCamera02:", realTarget02)
 
         if shape == "0_degree":
             backOx = 0
             testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alphaA, alphaB)
-            obj.test_target(realTarget01, realTarget02, angleLaserToObject, alphaA, alphaB)
+            newFlangePos01, newFlangeRot01 = obj.test_target(realTarget01, realTarget02, angleLaserToObject, alphaA, alphaB)
+            target01_none_mat = np.concatenate((newFlangePos01, newFlangeRot01), axis=0)
+            target01 = TxyzRxyz_2_Pose(target01_none_mat)
 
         else:
             stop()
     
-        return testTarget01, testTarget02, angleLaserToObject , test_length_weld
+        return testTarget01, testTarget02, angleLaserToObject , test_length_weld, target01
 
     def runMoveL(self, target, speedScan):
         self.setRobot(speedScan, CFG.JOINT_SPEEDS[1])
@@ -420,10 +440,10 @@ class VisionRobot:
         return True
 
     def setRobot(self, linearSpeed, jointSpeed):
-        self.robot.setRounding(5)  # Set the rounding parameter
+        self.robot.setRounding(40)  # Set the rounding parameter
         self.robot.setSpeed(linearSpeed)  # Set linear speed in mm/s
         self.robot.setSpeedJoints(jointSpeed)
-        self.robot.setAccelerationJoints(10)
+        self.robot.setAccelerationJoints(1)
 
     def getParam(self):
         """Get custom binary data from this item. Use setParam to set the data"""
