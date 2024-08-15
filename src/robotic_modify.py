@@ -74,9 +74,8 @@ def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
     else:
         stop()
     # print("alpha", alpha)
-    target01, target02, _, _, H_flangeToBase01 = VisRob.getTarget(realTargetStart, realTargetEnd, alpha[0], alpha[0], "0_degree")
-    VisRob.runMoveJ(target01, CFG.JOINT_SPEEDS[1])
-
+    target01, target02, _, _, target_to_send = VisRob.getTarget(realTargetStart, realTargetEnd, alpha[0], alpha[0], "0_degree")
+    # VisRob.runMoveJ(target01, CFG.JOINT_SPEEDS[1])
 
     # joints, _ = VisRob.getParam()
     # print("joints:", joints)
@@ -86,45 +85,30 @@ def run(realTargetStart, realTargetEnd, alpha, newTarget, pos_status="home"):
     # print("H_flangeToBase01:", H_flangeToBase01)
     # new_joints = VisRob.robot.SolveIK(H_flangeToBase01)
     # print("new_joints:", new_joints)
-    
-
+     
+    _target = []
     for i in range(1, len(newTarget) - 1):
         pointA = newTarget[i]
         pointB = newTarget[i + 1]
         alpha_i = alpha[i]
-        target_i0, target_i1, _, _, _ = VisRob.getTarget(pointA, pointB, alpha_i, 0, "0_degree")
-        VisRob.runMoveJ(target_i0, CFG.LINEAR_SPEEDS[0])
+        target_i0, target_i1, _, _, target_to_send = VisRob.getTarget(pointA, pointB, alpha_i, 0, "0_degree")
+        # VisRob.runMoveJ(target_i0, CFG.LINEAR_SPEEDS[0])
+        _target.append(target_to_send)
+
+    print("_target:", _target[:3])
+
     
     for i in range(len(newTarget)-1, 1, -1):
         pointA = newTarget[i]
         pointB = newTarget[i -1]
         alpha_i = alpha[i]
         target_i0, target_i1, _, _, _ = VisRob.getTarget(pointA, pointB, alpha_i, 0, "0_degree")
-        VisRob.runMoveJ(target_i0, CFG.LINEAR_SPEEDS[0])
+        # VisRob.runMoveJ(target_i0, CFG.LINEAR_SPEEDS[0])
 
-
-    pointA = newTarget[20]
-    pointB = newTarget[-1]
-    alphaA = alpha[20]
-    alphaB = alpha[-1]
-    # target_i0, target_i1, thetaLaser, _ = VisRob.getTarget(pointA, pointB, alphaA, alphaB, "0_degree")
-    # print("target_i0:", type(target_i0))
-    # print("target_i1:", target_i1)
-
-    joint_i0 = [22.001953, 32.123475, -25.801392, 16.242188, -37.162627, -35.410395]
-    joint_i1 = [38.448242, 45.288118, -8.478150, 23.878126, -54.849241, -55.517372]
-    # print("joint_i0:", type(joint_i0))
-
-    # VisRob.runMoveC(target_i0, target_i1, CFG.JOINT_SPEEDS[0])
-
-    # VisRob.runMoveL(target_i1, CFG.LINEAR_SPEEDS[1])
-
-    VisRob.homePos(CFG.LINEAR_SPEEDS[0], CFG.JOINT_SPEEDS[1])
+    # VisRob.homePos(CFG.LINEAR_SPEEDS[0], CFG.JOINT_SPEEDS[1])
 
     data_export = {
         "id": str(datetime.now()),
-        # "theta_laser": thetaLaser,
-        # Add additional data to export if needed
     }
     print(f"data_export: {data_export}")
     # rob.RobotModule.export_csv(data_export)   
@@ -328,7 +312,7 @@ class VisionRobot:
         # print(f'rf_laser2flange:{self.rf_laser2flange}')
         newFlangePos01, newFlangeRot01 = self.robot_module.rotPos(H_flangeToBase01)
         newFlangePos02, newFlangeRot02 = self.robot_module.rotPos(H_flangeToBase02)
-        print(f'newFlangePos01:{newFlangePos01}, {newFlangeRot01},\n newFlangePos02:{newFlangePos02}, {newFlangeRot02}\n')
+        # print(f'newFlangePos01:{newFlangePos01}, {newFlangeRot01},\n newFlangePos02:{newFlangePos02}, {newFlangeRot02}\n')
         return newFlangePos01, newFlangeRot01
 
    #####################################################
@@ -405,7 +389,7 @@ class VisionRobot:
         angleLaserToObject = 0    #### not input angleLaserToObject
         
         zLaserToObject = realTarget01[2] - CFG.DISTANCE_LASER2OBJECT
-        print(f"zLaserToObject:{zLaserToObject}")
+        # print(f"zLaserToObject:{zLaserToObject}")
         if zLaserToObject > CFG.SAFE_DISTANCE:
             realTarget01[2], realTarget02[2] = 330, 330
             print("Warning the collision. Check the distance")
@@ -416,13 +400,18 @@ class VisionRobot:
             backOx = 0
             testTarget01, testTarget02, test_length_weld = self.newcreatePoint(realTarget01, realTarget02, angleLaserToObject, backOx, alphaA, alphaB)
             newFlangePos01, newFlangeRot01 = obj.test_target(realTarget01, realTarget02, angleLaserToObject, alphaA, alphaB)
+
+            # print("newFlangePos01, newFlangeRot01:", newFlangePos01, newFlangeRot01)
+            degree_rot = np.degrees(newFlangeRot01)
             target01_none_mat = np.concatenate((newFlangePos01, newFlangeRot01), axis=0)
-            target01 = TxyzRxyz_2_Pose(target01_none_mat)
+            target_to_send = np.concatenate((newFlangePos01, degree_rot), axis=0)
+            # print("target_to_send:", target_to_send)
+            # target01 = TxyzRxyz_2_Pose(target01_none_mat)
 
         else:
             stop()
     
-        return testTarget01, testTarget02, angleLaserToObject , test_length_weld, target01
+        return testTarget01, testTarget02, angleLaserToObject , test_length_weld, target_to_send
 
     def runMoveL(self, target, speedScan):
         self.setRobot(speedScan, CFG.JOINT_SPEEDS[1])
